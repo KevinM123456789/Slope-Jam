@@ -58,6 +58,7 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
   const localStreamRef = useRef<MediaStream | null>(null);
   const localUserRef = useRef(localUser);
   const isHostRef = useRef(isHost);
+  const joinedPeerIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => { localUserRef.current = localUser; }, [localUser]);
 
