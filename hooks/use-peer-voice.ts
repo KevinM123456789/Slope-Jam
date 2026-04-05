@@ -22,25 +22,9 @@ interface UserInfoPayload {
   isHost: boolean;
 }
 
-interface SpeakingStatePayload {
-  isSpeaking: boolean;
-}
-
-interface FlowModePayload {
-  isInFlowMode: boolean;
-}
-
-interface PeerListPayload {
-  peerIds: string[];
-}
-
 interface UsePeerVoiceOptions {
   roomCode: string;
-  localUser: {
-    id: string;
-    displayName: string;
-    hasSpotify: boolean;
-  };
+  localUser: { id: string; displayName: string; hasSpotify: boolean };
   isHost: boolean;
   onParticipantJoin?: (participant: RoomParticipant) => void;
   onParticipantLeave?: (peerId: string) => void;
@@ -50,38 +34,14 @@ interface UsePeerVoiceOptions {
   onTrackInfo?: (track: TrackInfoPayload) => void;
 }
 
-interface PeerConnection {
+interface PeerConn {
   peerId: string;
-  dataConnection: import("peerjs").DataConnection | null;
   mediaConnection: import("peerjs").MediaConnection | null;
   audioElement: HTMLAudioElement | null;
-  confirmed: boolean;
-}
-
-function generatePeerId(roomCode: string, isHost: boolean): string {
-  const sanitizedCode = roomCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-  if (isHost) return `slopejam-${sanitizedCode}-host`;
-  const uid = crypto.randomUUID().slice(0, 8);
-  return `slopejam-${sanitizedCode}-${uid}`;
-}
-
-function getHostPeerId(roomCode: string): string {
-  const sanitizedCode = roomCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-  return `slopejam-${sanitizedCode}-host`;
 }
 
 export function usePeerVoice(options: UsePeerVoiceOptions) {
-  const {
-    roomCode,
-    localUser,
-    isHost,
-    onParticipantJoin,
-    onParticipantLeave,
-    onParticipantUpdate,
-    onRemoteSpeaking,
-    onPingReceived,
-    onTrackInfo,
-  } = options;
+  const { roomCode, localUser, isHost, onParticipantJoin, onParticipantLeave, onParticipantUpdate, onRemoteSpeaking, onPingReceived, onTrackInfo } = options;
 
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -92,165 +52,39 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
   const [participantCount, setParticipantCount] = useState(1);
 
   const peerRef = useRef<import("peerjs").default | null>(null);
-  const connectionsRef = useRef<Map<string, PeerConnection>>(new Map());
+  const ablyRef = useRef<import("ably").Realtime | null>(null);
+  const channelRef = useRef<import("ably").RealtimeChannel | null>(null);
+  const connectionsRef = useRef<Map<string, PeerConn>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(null);
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const connectedPeerIdsRef = useRef<Set<string>>(new Set());
-  const localPeerIdRef = useRef<string | null>(null);
   const localUserRef = useRef(localUser);
   const isHostRef = useRef(isHost);
 
   useEffect(() => { localUserRef.current = localUser; }, [localUser]);
 
-  const broadcast = useCallback((message: PeerMessage) => {
-    connectionsRef.current.forEach((conn) => {
-      if (conn.confirmed && conn.dataConnection?.open) {
-        try { conn.dataConnection.send(message); } catch {}
-      }
-    });
+  const broadcastToChannel = useCallback((type: string, payload: unknown) => {
+    channelRef.current?.publish(type, payload).catch(() => {});
   }, []);
-
-  const broadcastPeerList = useCallback(() => {
-    if (!isHostRef.current) return;
-    const peerIds = Array.from(connectedPeerIdsRef.current);
-    broadcast({ type: "peer-list", payload: { peerIds } as PeerListPayload });
-  }, [broadcast]);
 
   const broadcastSpeakingState = useCallback((isSpeaking: boolean) => {
-    broadcast({ type: "speaking-state", payload: { isSpeaking } as SpeakingStatePayload });
-  }, [broadcast]);
-
-  const sendPingTo = useCallback((targetPeerId: string) => {
-    const conn = connectionsRef.current.get(targetPeerId);
-    if (conn?.confirmed && conn.dataConnection?.open) {
-      conn.dataConnection.send({
-        type: "ping",
-        payload: { fromName: localUserRef.current?.displayName ?? "Someone", fromPeerId: localUserRef.current?.id ?? "" },
-      });
-    }
-  }, []);
+    broadcastToChannel("speaking-state", { isSpeaking, peerId: peerRef.current?.id });
+  }, [broadcastToChannel]);
 
   const broadcastFlowMode = useCallback((isInFlowMode: boolean) => {
-    broadcast({ type: "flow-mode", payload: { isInFlowMode } as FlowModePayload });
-  }, [broadcast]);
+    broadcastToChannel("flow-mode", { isInFlowMode, peerId: peerRef.current?.id });
+  }, [broadcastToChannel]);
 
   const broadcastMuteState = useCallback((isMuted: boolean) => {
-    broadcast({ type: "mute-state", payload: { isMuted } });
-  }, [broadcast]);
+    broadcastToChannel("mute-state", { isMuted, peerId: peerRef.current?.id });
+  }, [broadcastToChannel]);
 
   const broadcastTrackInfo = useCallback((track: TrackInfoPayload) => {
     if (!isHostRef.current) return;
-    broadcast({ type: "track-info", payload: track });
-  }, [broadcast]);
+    broadcastToChannel("track-info", track);
+  }, [broadcastToChannel]);
 
-  const handleDataMessage = useCallback((peerId: string, message: PeerMessage) => {
-    switch (message.type) {
-      case "user-info": {
-        const payload = message.payload as UserInfoPayload;
-        onParticipantJoin?.({ id: crypto.randomUUID(), peerId, displayName: payload.displayName, hasSpotify: payload.hasSpotify, isHost: payload.isHost, isSpeaking: false, isMuted: false, isInFlowMode: false });
-        setParticipantCount(connectionsRef.current.size + 1);
-        broadcastPeerList();
-        break;
-      }
-      case "speaking-state": {
-        const payload = message.payload as SpeakingStatePayload;
-        onRemoteSpeaking?.(peerId, payload.isSpeaking);
-        onParticipantUpdate?.(peerId, { isSpeaking: payload.isSpeaking });
-        break;
-      }
-      case "ping": {
-        const payload = message.payload as { fromName: string };
-        onPingReceived?.(payload.fromName);
-        break;
-      }
-      case "flow-mode": {
-        const payload = message.payload as FlowModePayload;
-        onParticipantUpdate?.(peerId, { isInFlowMode: payload.isInFlowMode });
-        break;
-      }
-      case "peer-list": {
-        if (!isHostRef.current) {
-          const payload = message.payload as PeerListPayload;
-          for (const otherPeerId of payload.peerIds) {
-            const existing = connectionsRef.current.get(otherPeerId);
-            if ((!existing || !existing.confirmed) && otherPeerId !== localPeerIdRef.current) {
-              connectToPeer(otherPeerId);
-            }
-          }
-        }
-        break;
-      }
-      case "mute-state": {
-        const payload = message.payload as { isMuted: boolean };
-        onParticipantUpdate?.(peerId, { isMuted: payload.isMuted });
-        break;
-      }
-      case "track-info": {
-        if (!isHostRef.current) {
-          onTrackInfo?.(message.payload as TrackInfoPayload);
-        }
-        break;
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [broadcastPeerList, onParticipantJoin, onParticipantUpdate, onRemoteSpeaking, onPingReceived, onTrackInfo]);
-
-  const connectToPeer = useCallback((targetPeerId: string) => {
-    if (!peerRef.current || !localStreamRef.current) return;
-    const existing = connectionsRef.current.get(targetPeerId);
-    if (existing?.confirmed) return;
-    if (targetPeerId === localPeerIdRef.current) return;
-
-    const peer = peerRef.current;
-    const connection: PeerConnection = { peerId: targetPeerId, dataConnection: null, mediaConnection: null, audioElement: null, confirmed: false };
-    connectionsRef.current.set(targetPeerId, connection);
-
-    const dataConn = peer.connect(targetPeerId, { reliable: true });
-    connection.dataConnection = dataConn;
-
-    const openTimeout = setTimeout(() => {
-      if (!connection.confirmed) {
-        connectionsRef.current.delete(targetPeerId);
-        dataConn.close();
-      }
-    }, 5000);
-
-    dataConn.on("open", () => {
-      clearTimeout(openTimeout);
-      connection.confirmed = true;
-      connectedPeerIdsRef.current.add(targetPeerId);
-      dataConn.send({ type: "user-info", payload: { displayName: localUserRef.current?.displayName ?? "Guest", hasSpotify: localUserRef.current?.hasSpotify ?? false, isHost: isHostRef.current } as UserInfoPayload });
-      if (localStreamRef.current) {
-        const mediaConn = peer.call(targetPeerId, localStreamRef.current);
-        connection.mediaConnection = mediaConn;
-        mediaConn.on("stream", (remoteStream) => {
-          const audio = new Audio();
-          audio.srcObject = remoteStream;
-          audio.autoplay = true;
-          audio.preload = "auto";
-          connection.audioElement = audio;
-          audio.play().catch(() => {});
-        });
-      }
-    });
-
-    dataConn.on("data", (data) => { handleDataMessage(targetPeerId, data as PeerMessage); });
-
-    dataConn.on("close", () => {
-      clearTimeout(openTimeout);
-      onParticipantLeave?.(targetPeerId);
-      connectionsRef.current.delete(targetPeerId);
-      connectedPeerIdsRef.current.delete(targetPeerId);
-      setParticipantCount(connectionsRef.current.size + 1);
-      broadcastPeerList();
-    });
-
-    dataConn.on("error", () => {
-      clearTimeout(openTimeout);
-      connectionsRef.current.delete(targetPeerId);
-      connectedPeerIdsRef.current.delete(targetPeerId);
-    });
-  }, [handleDataMessage, broadcastPeerList, onParticipantLeave]);
+  const sendPingTo = useCallback((targetPeerId: string) => {
+    broadcastToChannel("ping", { targetPeerId, fromName: localUserRef.current?.displayName ?? "Someone" });
+  }, [broadcastToChannel]);
 
   const initializePeer = useCallback(async () => {
     if (peerRef.current) return;
@@ -264,88 +98,136 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
       localStreamRef.current = stream;
       setLocalStream(stream);
 
+      // Get Ably token from our API
+      const tokenRes = await fetch("/api/ably-token");
+      const tokenRequest = await tokenRes.json();
+
+      const { Realtime } = await import("ably");
+      const ably = new Realtime({ authCallback: (_data, callback) => callback(null, tokenRequest) });
+      ablyRef.current = ably;
+
+      const channel = ably.channels.get(`slopejam-${roomCode}`);
+      channelRef.current = channel;
+
       const { default: Peer } = await import("peerjs");
-      const peerId = generatePeerId(roomCode, isHost);
-      const peer = new Peer(peerId, { debug: 0, config: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }] } });
+      const uid = crypto.randomUUID().slice(0, 8);
+      const peerId = isHost ? `slopejam-${roomCode}-host` : `slopejam-${roomCode}-${uid}`;
+
+      const peer = new Peer(peerId, {
+        debug: 0,
+        config: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }] },
+      });
 
       peer.on("open", (id) => {
-        localPeerIdRef.current = id;
         setLocalPeerId(id);
         setIsConnected(true);
         setIsConnecting(false);
+        peerRef.current = peer;
 
-        if (!isHost) {
-          const hostPeerId = getHostPeerId(roomCode);
-          let retryCount = 0;
-          const tryConnectToHost = () => {
-            if (retryCount >= 5) { setError("Could not find room host. They may have left."); return; }
-            const existing = connectionsRef.current.get(hostPeerId);
-            if (!existing?.confirmed) {
-              if (existing && !existing.confirmed) connectionsRef.current.delete(hostPeerId);
-              connectToPeer(hostPeerId);
+        // Announce presence on Ably channel
+        channel.publish("join", {
+          peerId: id,
+          displayName: localUserRef.current.displayName,
+          hasSpotify: localUserRef.current.hasSpotify,
+          isHost,
+        });
+
+        // Subscribe to channel messages
+        channel.subscribe((msg) => {
+          const data = msg.data as Record<string, unknown>;
+          const remotePeerId = data.peerId as string;
+          if (!remotePeerId || remotePeerId === id) return;
+
+          switch (msg.name) {
+            case "join": {
+              // Connect to new peer via WebRTC
+              if (!connectionsRef.current.has(remotePeerId) && localStreamRef.current) {
+                const mediaConn = peer.call(remotePeerId, localStreamRef.current);
+                const conn: PeerConn = { peerId: remotePeerId, mediaConnection: mediaConn, audioElement: null };
+                connectionsRef.current.set(remotePeerId, conn);
+
+                mediaConn.on("stream", (remoteStream) => {
+                  const audio = new Audio();
+                  audio.srcObject = remoteStream;
+                  audio.autoplay = true;
+                  audio.preload = "auto";
+                  conn.audioElement = audio;
+                  audio.play().catch(() => {});
+                });
+              }
+
+              onParticipantJoin?.({
+                id: crypto.randomUUID(),
+                peerId: remotePeerId,
+                displayName: data.displayName as string,
+                hasSpotify: data.hasSpotify as boolean,
+                isHost: data.isHost as boolean,
+                isSpeaking: false,
+                isMuted: false,
+                isInFlowMode: false,
+              });
+              setParticipantCount(prev => prev + 1);
+              break;
             }
-            retryCount++;
-            retryTimeoutRef.current = setTimeout(() => {
-              if (!connectionsRef.current.get(hostPeerId)?.confirmed) tryConnectToHost();
-            }, 2000);
-          };
-          tryConnectToHost();
-        }
-      });
-
-      peer.on("connection", (dataConn) => {
-        const remotePeerId = dataConn.peer;
-        const connection: PeerConnection = { peerId: remotePeerId, dataConnection: dataConn, mediaConnection: null, audioElement: null, confirmed: false };
-
-        dataConn.on("open", () => {
-          connection.confirmed = true;
-          connectionsRef.current.set(remotePeerId, connection);
-          connectedPeerIdsRef.current.add(remotePeerId);
-          setParticipantCount(connectionsRef.current.size + 1);
-          dataConn.send({ type: "user-info", payload: { displayName: localUserRef.current?.displayName ?? "Guest", hasSpotify: localUserRef.current?.hasSpotify ?? false, isHost: isHostRef.current } as UserInfoPayload });
-          if (isHostRef.current) setTimeout(() => broadcastPeerList(), 500);
-        });
-
-        dataConn.on("data", (data) => { handleDataMessage(remotePeerId, data as PeerMessage); });
-
-        dataConn.on("close", () => {
-          onParticipantLeave?.(remotePeerId);
-          connectionsRef.current.delete(remotePeerId);
-          connectedPeerIdsRef.current.delete(remotePeerId);
-          setParticipantCount(connectionsRef.current.size + 1);
-          broadcastPeerList();
+            case "leave": {
+              onParticipantLeave?.(remotePeerId);
+              const conn = connectionsRef.current.get(remotePeerId);
+              if (conn) { conn.mediaConnection?.close(); conn.audioElement?.pause(); }
+              connectionsRef.current.delete(remotePeerId);
+              setParticipantCount(prev => Math.max(1, prev - 1));
+              break;
+            }
+            case "speaking-state":
+              onRemoteSpeaking?.(remotePeerId, data.isSpeaking as boolean);
+              onParticipantUpdate?.(remotePeerId, { isSpeaking: data.isSpeaking as boolean });
+              break;
+            case "flow-mode":
+              onParticipantUpdate?.(remotePeerId, { isInFlowMode: data.isInFlowMode as boolean });
+              break;
+            case "mute-state":
+              onParticipantUpdate?.(remotePeerId, { isMuted: data.isMuted as boolean });
+              break;
+            case "ping":
+              if (data.targetPeerId === id) onPingReceived?.(data.fromName as string);
+              break;
+            case "track-info":
+              if (!isHostRef.current) onTrackInfo?.(data as unknown as TrackInfoPayload);
+              break;
+          }
         });
       });
 
+      // Handle incoming WebRTC calls
       peer.on("call", (mediaConn) => {
-        const remotePeerId = mediaConn.peer;
         if (localStreamRef.current) mediaConn.answer(localStreamRef.current);
+        const remotePeerId = mediaConn.peer;
+        let conn = connectionsRef.current.get(remotePeerId);
+        if (!conn) {
+          conn = { peerId: remotePeerId, mediaConnection: mediaConn, audioElement: null };
+          connectionsRef.current.set(remotePeerId, conn);
+        }
         mediaConn.on("stream", (remoteStream) => {
           const audio = new Audio();
           audio.srcObject = remoteStream;
           audio.autoplay = true;
           audio.preload = "auto";
-          const existing = connectionsRef.current.get(remotePeerId);
-          if (existing) { existing.mediaConnection = mediaConn; existing.audioElement = audio; }
+          conn!.audioElement = audio;
           audio.play().catch(() => {});
         });
       });
 
       peer.on("error", (err) => {
-        if (err.type === "unavailable-id" && isHost) setError("Another host is already in this room.");
-        else if (err.type !== "peer-unavailable") setError(err.message);
+        if (err.type !== "peer-unavailable") setError(err.message);
         setIsConnecting(false);
       });
 
       peer.on("disconnected", () => { setIsConnected(false); peer.reconnect(); });
 
-      peerRef.current = peer;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to connect");
       setIsConnecting(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomCode, isHost, connectToPeer, broadcastPeerList, handleDataMessage]);
+  }, [roomCode, isHost, onParticipantJoin, onParticipantLeave, onParticipantUpdate, onRemoteSpeaking, onPingReceived, onTrackInfo]);
 
   const toggleMute = useCallback(() => {
     if (localStreamRef.current) {
@@ -354,11 +236,17 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
     }
   }, []);
 
+  const connectToPeer = useCallback((_peerId: string) => {
+    // Connections now handled via Ably presence — no manual connect needed
+  }, []);
+
   useEffect(() => {
     return () => {
-      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
-      localStreamRef.current?.getTracks().forEach((track) => track.stop());
-      connectionsRef.current.forEach((conn) => { conn.dataConnection?.close(); conn.mediaConnection?.close(); conn.audioElement?.pause(); });
+      channelRef.current?.publish("leave", { peerId: peerRef.current?.id }).catch(() => {});
+      channelRef.current?.unsubscribe();
+      ablyRef.current?.close();
+      localStreamRef.current?.getTracks().forEach((t) => t.stop());
+      connectionsRef.current.forEach((conn) => { conn.mediaConnection?.close(); conn.audioElement?.pause(); });
       peerRef.current?.destroy();
     };
   }, []);
