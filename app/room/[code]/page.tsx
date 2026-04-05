@@ -2,6 +2,7 @@
 
 import { use, useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -12,6 +13,7 @@ import {
   Settings,
   Headphones,
   HeadphoneOff,
+  LogOut,
 } from "lucide-react";
 import { useRoom } from "@/contexts/room-context";
 import { useAudioDucking } from "@/hooks/use-audio-ducking";
@@ -311,8 +313,6 @@ export default function RoomPage({ params }: RoomPageProps) {
         if (typeof resumeAudioContext === "function") {
           await resumeAudioContext();
         }
-        // Note: Spotify auto-resume removed - let NowPlayingCard handle its own state
-        // This prevents voice components from re-rendering when Spotify state changes
       }
     };
 
@@ -322,7 +322,7 @@ export default function RoomPage({ params }: RoomPageProps) {
       wakeLock?.release();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [resumeAudioContext]); // Removed Spotify dependencies to prevent re-renders
+  }, [resumeAudioContext]);
 
   // Handle mute toggle - also broadcast to peers for iOS sync
   const handleMuteToggle = useCallback(() => {
@@ -388,6 +388,15 @@ export default function RoomPage({ params }: RoomPageProps) {
     router.push("/");
   }, [disableMic, router]);
 
+  // Handle sign out - cleanup mic before signing out
+  const handleSignOut = useCallback(async () => {
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach(track => track.stop());
+    }
+    disableMic();
+    await signOut({ callbackUrl: "/" });
+  }, [disableMic]);
+
   // Show loading state while user is being loaded from session storage
   if (!localUser) {
     return (
@@ -446,7 +455,7 @@ export default function RoomPage({ params }: RoomPageProps) {
         )}
       </AnimatePresence>
 
-      {/* Header - Fixed with clear background and high z-index */}
+      {/* Header */}
       <header className="sticky top-0 z-50 flex items-center justify-between px-4 py-4 border-b border-border bg-background/95 backdrop-blur-sm">
         <button
           onClick={handleLeave}
@@ -459,7 +468,6 @@ export default function RoomPage({ params }: RoomPageProps) {
         <div className="flex flex-col items-center">
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Room</span>
-            {/* Connection status indicator - green when connected, red when not */}
             <div 
               className={`w-2 h-2 rounded-full ${
                 isPeerConnected 
@@ -475,7 +483,6 @@ export default function RoomPage({ params }: RoomPageProps) {
             <span className="text-lg font-mono font-bold text-foreground tracking-wider">
               {code}
             </span>
-            {/* User count badge */}
             {isPeerConnected && participantCount > 0 && (
               <span className="text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
                 {participantCount} in Jam
@@ -491,11 +498,10 @@ export default function RoomPage({ params }: RoomPageProps) {
             disabled={isInFlowMode}
             className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95 ${
               isMuted
-                ? "bg-red-500 text-white" // Bright red when muted
-                : "bg-muted text-green-500" // Grey bg with green icon when unmuted
+                ? "bg-red-500 text-white"
+                : "bg-muted text-green-500"
             } ${isInFlowMode ? "opacity-50" : ""}`}
           >
-            {/* Glow ring when speaking and unmuted */}
             {!isMuted && isUserSpeaking && (
               <motion.div
                 className="absolute inset-0 rounded-full bg-green-500/30"
@@ -516,6 +522,15 @@ export default function RoomPage({ params }: RoomPageProps) {
           >
             <Share2 className="w-5 h-5" />
             <span className="text-sm font-medium">{copied ? "Copied!" : "Share"}</span>
+          </button>
+
+          {/* Sign Out Button */}
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-1 text-muted-foreground touch-target active:opacity-70 transition-opacity"
+            title="Sign out of Spotify"
+          >
+            <LogOut className="w-5 h-5" />
           </button>
         </div>
       </header>
@@ -539,7 +554,6 @@ export default function RoomPage({ params }: RoomPageProps) {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col px-4 py-6 gap-6 overflow-y-auto">
-        {/* Now Playing Card - Only HOST fetches Spotify data, guests receive via socket */}
         {localUser.hasSpotify && (
           <NowPlayingCard
             volume={musicVolume}
@@ -547,7 +561,6 @@ export default function RoomPage({ params }: RoomPageProps) {
             isHost={isHostLocked}
             guestTrack={guestTrack}
             onTrackChange={(track) => {
-              // Host broadcasts track info to all guests
               if (isHostLocked && isPeerConnected) {
                 broadcastTrackInfo(track);
               }
@@ -555,7 +568,6 @@ export default function RoomPage({ params }: RoomPageProps) {
           />
         )}
 
-        {/* Participants - Simple list showing names and voice status */}
         <ParticipantsList
           participants={[
             {
@@ -564,7 +576,7 @@ export default function RoomPage({ params }: RoomPageProps) {
               displayName: localUser.displayName,
               isHost,
               hasSpotify: localUser.hasSpotify,
-              isSpeaking: showVoiceActivity, // Only show speaking when unmuted
+              isSpeaking: showVoiceActivity,
               isMuted: isMuted,
               isInFlowMode,
             },
@@ -572,9 +584,9 @@ export default function RoomPage({ params }: RoomPageProps) {
           ]}
           onMuteParticipant={(peerId) => updateParticipant(peerId, { isMuted: true })}
           onPingParticipant={handlePingParticipant}
-          isUserSpeaking={showVoiceActivity} // Only show when unmuted AND speaking
+          isUserSpeaking={showVoiceActivity}
           localUserId={localUser.id}
-          isPinged={!!lastPingFrom} // Show PINGED badge when local user was pinged
+          isPinged={!!lastPingFrom}
         />
 
         {/* Flow Mode Toggle */}
@@ -617,7 +629,6 @@ export default function RoomPage({ params }: RoomPageProps) {
 
       {/* Microphone Control - Fixed at bottom */}
       <div className="px-4 pb-6 pt-2 flex flex-col gap-3">
-        {/* Check Microphone button - shows when mic init failed on iOS */}
         {showMicRetry && !micInitialized && (
           <button
             onClick={async () => {
@@ -630,7 +641,7 @@ export default function RoomPage({ params }: RoomPageProps) {
             <span>Check Microphone</span>
           </button>
         )}
-        {/* Voice Activity Indicator - Only show when unmuted */}
+
         <AnimatePresence>
           {isMicEnabled && !isMuted && (
             <motion.div
@@ -654,7 +665,7 @@ export default function RoomPage({ params }: RoomPageProps) {
               <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
                 <motion.div
                   className={`h-full ${isUserSpeaking ? "bg-green-400" : "bg-muted-foreground/50"}`}
-                  animate={{ width: `${Math.min(currentRMS * 800, 100)}%` }} // Higher multiplier for better visibility
+                  animate={{ width: `${Math.min(currentRMS * 800, 100)}%` }}
                   transition={{ duration: 0.05 }}
                 />
               </div>
@@ -665,11 +676,11 @@ export default function RoomPage({ params }: RoomPageProps) {
         {/* Large Mute Toggle Button */}
         <motion.button
           onClick={handleMuteToggle}
-          disabled={isInFlowMode} // Disable during flow mode
+          disabled={isInFlowMode}
           className={`w-full flex items-center justify-center gap-4 py-6 rounded-2xl touch-target-xl transition-all active:scale-[0.98] ${
             isMuted
-              ? "bg-red-500 text-white" // Red when muted
-              : "bg-muted/80 text-muted-foreground" // Grey/subtle when unmuted
+              ? "bg-red-500 text-white"
+              : "bg-muted/80 text-muted-foreground"
           } ${isInFlowMode ? "opacity-50 cursor-not-allowed" : ""}`}
           animate={{
             boxShadow: !isMuted && isUserSpeaking
