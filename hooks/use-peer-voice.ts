@@ -112,7 +112,8 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
 
       const { default: Peer } = await import("peerjs");
       const uid = crypto.randomUUID().slice(0, 8);
-      const peerId = isHost ? `slopejam-${roomCode}-host` : `slopejam-${roomCode}-${uid}`;
+      const timestamp = Date.now().toString(36);
+const peerId = isHost ? `slopejam-${roomCode}-host-${timestamp}` : `slopejam-${roomCode}-${uid}`;
 
       const peer = new Peer(peerId, {
         debug: 0,
