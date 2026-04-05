@@ -161,6 +161,8 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
 
           switch (msg.name) {
             case "join": {
+               if (joinedPeerIdsRef.current.has(remotePeerId)) break;
+  joinedPeerIdsRef.current.add(remotePeerId);
               // Connect to new peer via WebRTC
               if (!connectionsRef.current.has(remotePeerId) && localStreamRef.current) {
                 const mediaConn = peer.call(remotePeerId, localStreamRef.current);
