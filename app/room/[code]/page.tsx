@@ -186,7 +186,7 @@ export default function RoomPage({ params }: RoomPageProps) {
       
       // Only initialize after permission granted
       await enableMic();
-      await initializePeer();
+      await initializePeer(stream);
       
       setMicInitialized(true);
       
