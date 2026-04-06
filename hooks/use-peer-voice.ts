@@ -180,7 +180,6 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
               // If I'm host, call the new guest AND re-announce so late joiners get my ID
              if (isHostRef.current) {
   makeAudioConnection(remotePeerId);
-}
               }
               break;
             }
