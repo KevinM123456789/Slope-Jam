@@ -163,7 +163,11 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
             case "join": {
               // FIX: deduplicate
               if (joinedPeerIdsRef.current.has(remotePeerId)) break;
-              joinedPeerIdsRef.current.add(remotePeerId);
+const displayName = data.displayName as string;
+const nameKey = `name-${displayName}`;
+if (joinedPeerIdsRef.current.has(nameKey)) break;
+joinedPeerIdsRef.current.add(remotePeerId);
+joinedPeerIdsRef.current.add(nameKey);
 
               onParticipantJoin?.({
                 id: crypto.randomUUID(),
