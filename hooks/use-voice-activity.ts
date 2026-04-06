@@ -148,7 +148,9 @@ export function useVoiceActivity(
       analyser.minDecibels = -85;
       analyser.maxDecibels = -10;
 
-      const source = audioContext.createMediaStreamSource(stream);
+      // Clone the stream for analysis so the original stays available for WebRTC
+const analysisStream = existingStream ? existingStream.clone() : stream;
+const source = audioContext.createMediaStreamSource(analysisStream);
       source.connect(analyser);
       // Don't connect to destination - we only analyze, prevents iOS audio session conflicts
 
