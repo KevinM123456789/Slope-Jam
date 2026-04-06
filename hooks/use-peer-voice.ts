@@ -113,8 +113,9 @@ if (msg.clientId === ablyRef.current?.auth.clientId) return;
       localStreamRef.current = stream;
       setLocalStream(stream);
 
-      const tokenRes = await fetch("/api/ably-token");
-      const tokenRequest = await tokenRes.json();
+    const tokenRes = await fetch("/api/ably-token");
+const tokenData = await tokenRes.json();
+const { clientId: myClientId, ...tokenRequest } = tokenData;
 
       const { Realtime } = await import("ably");
       const ably = new Realtime({ authCallback: (_data, callback) => callback(null, tokenRequest) });
