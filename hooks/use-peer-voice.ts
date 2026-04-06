@@ -83,7 +83,7 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
     if (!peerRef.current || !localStreamRef.current) return;
     if (connectionsRef.current.has(remotePeerId)) return;
     if (!remotePeerId || remotePeerId === myPeerIdRef.current) return;
-if (msg.clientId === myClientId) return;
+
 
     const mediaConn = peerRef.current.call(remotePeerId, localStreamRef.current);
     if (!mediaConn) return;
@@ -113,9 +113,8 @@ if (msg.clientId === myClientId) return;
       localStreamRef.current = stream;
       setLocalStream(stream);
 
-    const tokenRes = await fetch("/api/ably-token");
-const tokenData = await tokenRes.json();
-const { clientId: myClientId, ...tokenRequest } = tokenData;
+  const tokenRes = await fetch("/api/ably-token");
+const tokenRequest = await tokenRes.json();
 
       const { Realtime } = await import("ably");
       const ably = new Realtime({ authCallback: (_data, callback) => callback(null, tokenRequest) });
