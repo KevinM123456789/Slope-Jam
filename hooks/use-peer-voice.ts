@@ -82,7 +82,8 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
   const makeAudioConnection = useCallback((remotePeerId: string) => {
     if (!peerRef.current || !localStreamRef.current) return;
     if (connectionsRef.current.has(remotePeerId)) return;
-    if (remotePeerId === myPeerIdRef.current) return;
+    if (!remotePeerId || remotePeerId === myPeerIdRef.current) return;
+if (msg.clientId === ablyRef.current?.auth.clientId) return;
 
     const mediaConn = peerRef.current.call(remotePeerId, localStreamRef.current);
     if (!mediaConn) return;
