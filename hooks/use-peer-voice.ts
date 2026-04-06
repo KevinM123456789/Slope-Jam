@@ -101,17 +101,23 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
     });
   }, []);
 
-  const initializePeer = useCallback(async () => {
+  const initializePeer = useCallback(async (existingStream?: MediaStream) => {
+  if (existingStream) {
+    localStreamRef.current = existingStream;
+    setLocalStream(existingStream);
+  }
     if (peerRef.current) return;
     setIsConnecting(true);
     setError(null);
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: { ideal: true }, noiseSuppression: { ideal: true }, autoGainControl: { ideal: true }, sampleRate: { ideal: 16000 }, channelCount: { ideal: 1 } },
-      });
-      localStreamRef.current = stream;
-      setLocalStream(stream);
+     if (!localStreamRef.current) {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: { ideal: true }, noiseSuppression: { ideal: true }, autoGainControl: { ideal: true }, sampleRate: { ideal: 16000 }, channelCount: { ideal: 1 } },
+  });
+  localStreamRef.current = stream;
+  setLocalStream(stream);
+}
 
   const [tokenRes, turnRes] = await Promise.all([
   fetch("/api/ably-token"),
