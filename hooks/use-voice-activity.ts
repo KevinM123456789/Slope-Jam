@@ -14,7 +14,7 @@ interface UseVoiceActivityReturn {
   isMicEnabled: boolean;
   isSpeaking: boolean;
   currentRMS: number;
-  enableMic: () => Promise<boolean>;
+  enableMic: (existingStream?: MediaStream) => Promise<boolean>;
   disableMic: () => void;
   toggleMic: () => Promise<boolean>;
   resumeAudioContext: () => Promise<void>; // Manual resume for tab switch
