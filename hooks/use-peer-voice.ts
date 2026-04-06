@@ -113,8 +113,12 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
       localStreamRef.current = stream;
       setLocalStream(stream);
 
-  const tokenRes = await fetch("/api/ably-token");
+  const [tokenRes, turnRes] = await Promise.all([
+  fetch("/api/ably-token"),
+  fetch("/api/turn-credentials"),
+]);
 const tokenRequest = await tokenRes.json();
+const turnCredentials = await turnRes.json();
 
       const { Realtime } = await import("ably");
       const ably = new Realtime({ authCallback: (_data, callback) => callback(null, tokenRequest) });
@@ -136,11 +140,13 @@ const tokenRequest = await tokenRes.json();
         debug: 0,
         config: {
           iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
-            { urls: "stun:stun1.l.google.com:19302" },
-            { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
-            { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
-            { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+  {
+    urls: turnCredentials.urls,
+    username: turnCredentials.username,
+    credential: turnCredentials.credential,
+  },
           ],
         },
       });
