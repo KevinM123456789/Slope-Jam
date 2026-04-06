@@ -142,11 +142,11 @@ const turnCredentials = await turnRes.json();
           iceServers: [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
-  {
-    urls: turnCredentials.urls,
-    username: turnCredentials.username,
-    credential: turnCredentials.credential,
-  },
+...turnCredentials.urls.map((url: string) => ({
+  urls: url,
+  username: turnCredentials.username,
+  credential: turnCredentials.credential,
+})),
           ],
         },
       });
