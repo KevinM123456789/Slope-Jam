@@ -178,9 +178,9 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
               setParticipantCount(prev => prev + 1);
 
               // If I'm host, call the new guest AND re-announce so late joiners get my ID
-              if (isHostRef.current) {
-                makeAudioConnection(remotePeerId);
-                publishToChannel("host-announce", { hostPeerId: myPeerIdRef.current, peerId: myPeerIdRef.current });
+             if (isHostRef.current) {
+  makeAudioConnection(remotePeerId);
+}
               }
               break;
             }
