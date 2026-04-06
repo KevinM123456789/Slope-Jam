@@ -83,7 +83,7 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
     if (!peerRef.current || !localStreamRef.current) return;
     if (connectionsRef.current.has(remotePeerId)) return;
     if (!remotePeerId || remotePeerId === myPeerIdRef.current) return;
-if (msg.clientId === ablyRef.current?.auth.clientId) return;
+if (msg.clientId === myClientId) return;
 
     const mediaConn = peerRef.current.call(remotePeerId, localStreamRef.current);
     if (!mediaConn) return;
