@@ -116,20 +116,18 @@ export function useVoiceActivity(
     animationFrameRef.current = requestAnimationFrame(analyzeAudio);
   }, [threshold, speakingDelay, silenceDelay, handleVolumeChange]);
 
-  const enableMic = useCallback(async (): Promise<boolean> => {
+  const enableMic = useCallback(async (existingStream?: MediaStream): Promise<boolean> => {
     try {
       // Request mic with iOS-compatible settings
       // iOS Safari requires explicit constraints for proper audio session handling
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          // iOS needs these for proper audio mixing
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          // Mono voice
-          channelCount: 1,
-        },
-      });
+      const stream = existingStream ?? await navigator.mediaDevices.getUserMedia({
+  audio: {
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+    channelCount: 1,
+  },
+});
 
       // Create AudioContext - iOS requires this to be created after user gesture
       // Using standard sample rate for better iOS compatibility
