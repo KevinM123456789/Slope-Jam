@@ -147,12 +147,17 @@ const peerId = isHost ? `slopejam-${roomCode}-host-${timestamp}` : `slopejam-${r
         peerRef.current = peer;
 
         // Announce presence on Ably channel
-        channel.publish("join", {
-          peerId: id,
-          displayName: localUserRef.current.displayName,
-          hasSpotify: localUserRef.current.hasSpotify,
-          isHost,
-        });
+       channel.publish("join", {
+  peerId: id,
+  displayName: localUserRef.current.displayName,
+  hasSpotify: localUserRef.current.hasSpotify,
+  isHost,
+});
+
+// If host, also publish host-announce so guests know the current host peer ID
+if (isHost) {
+  channel.publish("host-announce", { hostPeerId: id });
+}
 
         // Subscribe to channel messages
         channel.subscribe((msg) => {
@@ -191,6 +196,25 @@ const peerId = isHost ? `slopejam-${roomCode}-host-${timestamp}` : `slopejam-${r
                 isInFlowMode: false,
               });
               setParticipantCount(prev => prev + 1);
+              break;
+            }
+              case "host-announce": {
+              if (!isHostRef.current && data.hostPeerId) {
+                const hostPeerId = data.hostPeerId as string;
+                if (!connectionsRef.current.has(hostPeerId) && localStreamRef.current && peerRef.current) {
+                  const mediaConn = peerRef.current.call(hostPeerId, localStreamRef.current);
+                  const conn: PeerConn = { peerId: hostPeerId, mediaConnection: mediaConn, audioElement: null };
+                  connectionsRef.current.set(hostPeerId, conn);
+                  mediaConn.on("stream", (remoteStream) => {
+                    const audio = new Audio();
+                    audio.srcObject = remoteStream;
+                    audio.autoplay = true;
+                    audio.preload = "auto";
+                    conn.audioElement = audio;
+                    audio.play().catch(() => {});
+                  });
+                }
+              }
               break;
             }
             case "leave": {
