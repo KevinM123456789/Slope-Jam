@@ -232,18 +232,19 @@ joinedPeerIdsRef.current.add(nameKey);
           }
         });
 
-        // Announce join
-        publishToChannel("join", {
-          peerId: id,
-          displayName: localUserRef.current.displayName,
-          hasSpotify: localUserRef.current.hasSpotify,
-          isHost,
-        });
+        // Small delay ensures subscribe is ready before we announce
+        setTimeout(() => {
+          publishToChannel("join", {
+            peerId: id,
+            displayName: localUserRef.current.displayName,
+            hasSpotify: localUserRef.current.hasSpotify,
+            isHost,
+          });
 
-        // Host immediately announces their peer ID
-        if (isHost) {
-          publishToChannel("host-announce", { hostPeerId: id, peerId: id });
-        }
+          if (isHost) {
+            publishToChannel("host-announce", { hostPeerId: id, peerId: id });
+          }
+        }, 500);
       });
 
       // Handle incoming WebRTC calls
