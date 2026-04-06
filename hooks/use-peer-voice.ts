@@ -119,7 +119,9 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
       const ably = new Realtime({ authCallback: (_data, callback) => callback(null, tokenRequest) });
       ablyRef.current = ably;
 
-      const channel = ably.channels.get(`slopejam-${roomCode}`);
+      const channel = ably.channels.get(`slopejam-${roomCode}`, {
+  params: { rewind: "0" }
+});
       channelRef.current = channel;
 
       const { default: Peer } = await import("peerjs");
