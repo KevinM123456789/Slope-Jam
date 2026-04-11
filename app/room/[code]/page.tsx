@@ -164,58 +164,54 @@ export default function RoomPage({ params }: RoomPageProps) {
 
   // Initialize microphone with iOS-compatible settings
   // iOS requires user gesture before AudioContext can be started
-  const initMic = useCallback(async () => {
-    if (!localUser) return false;
+const initMic = useCallback(async () => {
+  if (!localUser) return false;
+
+  try {
+    // Single getUserMedia call — shared between VAD and WebRTC
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: { ideal: 44100 },
+        channelCount: { ideal: 1 },
+      },
+    });
+
+    micStreamRef.current = stream;
+    setMicPermissionGranted(true);
+    setShowMicRetry(false);
+
+    // Pass stream to VAD for analysis
+    await enableMic(stream);
     
-    try {
-      // iOS-specific audio constraints with echo cancellation
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          // iOS works better with these explicit settings
-          sampleRate: { ideal: 44100 },
-          channelCount: { ideal: 1 },
-        } 
+    // Pass same stream to WebRTC for transmission
+    await initializePeer(stream);
+
+    setMicInitialized(true);
+
+    if (!hasShownConnectedToast.current) {
+      hasShownConnectedToast.current = true;
+      toast.success("Voice chat connected!", {
+        id: "voice-connected",
+        duration: 2000,
       });
-      
-      micStreamRef.current = stream;
-      setMicPermissionGranted(true);
-      setShowMicRetry(false);
-      
-      // Only initialize after permission granted
-      await enableMic();
-      await initializePeer(stream);
-      
-      setMicInitialized(true);
-      
-      // Show connected toast only once
-      if (!hasShownConnectedToast.current) {
-        hasShownConnectedToast.current = true;
-        toast.success("Voice chat connected!", { 
-          id: "voice-connected",
-          duration: 2000 
-        });
-      }
-      
-      return true;
-    } catch (error) {
-      setMicPermissionGranted(false);
-      setShowMicRetry(true);
-      
-      if (error instanceof DOMException && error.name === "NotAllowedError") {
-        toast.error("Microphone access blocked. Tap 'Check Microphone' to retry.", {
-          id: "mic-blocked",
-        });
-      } else {
-        toast.error("Failed to connect microphone. Tap 'Check Microphone' to retry.", { 
-          id: "mic-error" 
-        });
-      }
-      return false;
     }
-  }, [localUser, enableMic, initializePeer]);
+
+    return true;
+  } catch (error) {
+    setMicPermissionGranted(false);
+    setShowMicRetry(true);
+
+    if (error instanceof DOMException && error.name === "NotAllowedError") {
+      toast.error("Microphone access blocked.", { id: "mic-blocked" });
+    } else {
+      toast.error("Failed to connect microphone.", { id: "mic-error" });
+    }
+    return false;
+  }
+}, [localUser, enableMic, initializePeer]);
 
   // Auto-enable microphone on mount (but only after user has interacted)
   // iOS Safari requires a user gesture before we can use AudioContext
