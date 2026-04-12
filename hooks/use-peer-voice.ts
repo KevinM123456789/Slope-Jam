@@ -49,6 +49,7 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
   const localStreamRef = useRef<MediaStream | null>(null);
   const localUserRef = useRef(localUser);
   const isHostRef = useRef(isHost);
+  useEffect(() => { isHostRef.current = isHost; }, [isHost]);
   const myPeerIdRef = useRef<string | null>(null);
   const peersRef = useRef<Map<string, PeerConn>>(new Map());
   const joinedPeerIdsRef = useRef<Set<string>>(new Set());
@@ -216,10 +217,11 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
             });
             setParticipantCount(prev => prev + 1);
 
-            // Host calls each new guest
-            if (isHostRef.current) {
-              setTimeout(() => initiateCall(fromPeerId), 500);
-            }
+         // Host calls each new guest
+console.log("IS HOST:", isHostRef.current, "will call:", fromPeerId);
+if (isHostRef.current) {
+  setTimeout(() => initiateCall(fromPeerId), 500);
+}
             break;
           }
 
