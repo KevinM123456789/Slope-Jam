@@ -123,9 +123,10 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
     return pc;
   }, [publish]);
 
-  const initiateCall = useCallback(async (remotePeerId: string) => {
-    if (peersRef.current.has(remotePeerId)) return;
-    if (remotePeerId === myPeerIdRef.current) return;
+ const initiateCall = useCallback(async (remotePeerId: string) => {
+  console.log("INITIATE CALL to:", remotePeerId, "myId:", myPeerIdRef.current);
+  if (peersRef.current.has(remotePeerId)) return;
+  if (remotePeerId === myPeerIdRef.current) return;
 
     const pc = createPC(remotePeerId);
     peersRef.current.set(remotePeerId, { peerId: remotePeerId, pc, audioEl: null });
@@ -133,6 +134,8 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
     try {
       const offer = await pc.createOffer({ offerToReceiveAudio: true });
       await pc.setLocalDescription(offer);
+      console.log("SENDING OFFER to:", remotePeerId, "from:", myPeerIdRef.current);
+publish("offer", {
       publish("offer", {
         targetPeerId: remotePeerId,
         offer: { type: offer.type, sdp: offer.sdp },
