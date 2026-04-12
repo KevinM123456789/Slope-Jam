@@ -226,11 +226,17 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
             if (data.targetPeerId !== myPeerId) break;
             (async () => {
               let conn = peersRef.current.get(fromPeerId);
-              if (!conn) {
-                const pc = createPC(fromPeerId);
-                conn = { peerId: fromPeerId, pc, audioEl: null };
-                peersRef.current.set(fromPeerId, conn);
-              }
+if (!conn) {
+  const pc = createPC(fromPeerId);
+  // Add local tracks so the other side can hear us
+  if (localStreamRef.current) {
+    localStreamRef.current.getTracks().forEach(track => {
+      pc.addTrack(track, localStreamRef.current!);
+    });
+  }
+  conn = { peerId: fromPeerId, pc, audioEl: null };
+  peersRef.current.set(fromPeerId, conn);
+}
               try {
                 await conn.pc.setRemoteDescription(
                   new RTCSessionDescription(data.offer as RTCSessionDescriptionInit)
