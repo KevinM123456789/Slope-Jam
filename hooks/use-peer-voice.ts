@@ -146,6 +146,7 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
   }, [createPC, publish]);
 
   const initializePeer = useCallback(async (existingStream?: MediaStream) => {
+   console.log("INITIALIZE PEER CALLED, already exists:", !!ablyRef.current);
     if (ablyRef.current) return;
     setIsConnecting(true);
     setError(null);
