@@ -101,7 +101,6 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
     pc.ontrack = (event) => {
       const conn = peersRef.current.get(remotePeerId);
       if (!conn) return;
-      if (conn.audioEl) return; // already set up
       const audio = new Audio();
       audio.srcObject = event.streams[0];
       audio.autoplay = true;
@@ -236,7 +235,7 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
                 await conn.pc.setRemoteDescription(
                   new RTCSessionDescription(data.offer as RTCSessionDescriptionInit)
                 );
-                const answer = await conn.pc.createAnswer();
+                const answer = await conn.pc.createAnswer({ offerToReceiveAudio: true });
                 await conn.pc.setLocalDescription(answer);
                 publish("answer", {
                   targetPeerId: fromPeerId,
