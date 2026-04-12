@@ -136,7 +136,6 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
       await pc.setLocalDescription(offer);
       console.log("SENDING OFFER to:", remotePeerId, "from:", myPeerIdRef.current);
 publish("offer", {
-      publish("offer", {
         targetPeerId: remotePeerId,
         offer: { type: offer.type, sdp: offer.sdp },
         peerId: myPeerIdRef.current,
