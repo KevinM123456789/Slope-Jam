@@ -196,6 +196,7 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
 
         switch (msg.name) {
           case "join": {
+  console.log("JOIN RECEIVED from:", fromPeerId, data.displayName);
             if (joinedPeerIdsRef.current.has(fromPeerId)) break;
             const displayName = data.displayName as string;
             const nameKey = `name-${displayName}`;
@@ -223,8 +224,10 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
           }
 
           case "offer": {
-            if (data.targetPeerId !== myPeerId) break;
-            (async () => {
+  console.log("OFFER RECEIVED, target:", data.targetPeerId, "myId:", myPeerId, "match:", data.targetPeerId === myPeerId);
+  if (data.targetPeerId !== myPeerId) break;
+  (async () => {
+    console.log("PROCESSING OFFER from:", fromPeerId);
               let conn = peersRef.current.get(fromPeerId);
 if (!conn) {
   const pc = createPC(fromPeerId);
