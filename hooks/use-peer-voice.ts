@@ -88,6 +88,18 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
 
   const connectToPeer = useCallback((_peerId: string) => {}, []);
 
+  const replaceLocalTrack = useCallback(async (newStream: MediaStream) => {
+    const newTrack = newStream.getAudioTracks()[0];
+    if (!newTrack) return;
+    localStreamRef.current = newStream;
+    for (const conn of peersRef.current.values()) {
+      const audioSender = conn.pc.getSenders().find(s => s.track?.kind === "audio");
+      if (audioSender) {
+        await audioSender.replaceTrack(newTrack).catch(() => {});
+      }
+    }
+  }, []);
+
   const createPC = useCallback((remotePeerId: string): RTCPeerConnection => {
     const pc = new RTCPeerConnection(iceConfigRef.current);
 
@@ -363,10 +375,10 @@ useEffect(() => {
   };
 }, [publish]);
 
-  return {
+return {
     isConnected, isConnecting, localPeerId, error, participantCount,
     localStream, initializePeer, connectToPeer, toggleMute, isMicMuted,
     broadcastSpeakingState, broadcastFlowMode, broadcastMuteState,
-    broadcastTrackInfo, sendPingTo,
+    broadcastTrackInfo, sendPingTo, replaceLocalTrack,
   };
 }
