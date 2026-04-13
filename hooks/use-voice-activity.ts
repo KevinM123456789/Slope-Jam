@@ -135,11 +135,18 @@ export function useVoiceActivity(
       const audioContext = new AudioContextClass({
         latencyHint: "interactive",
       });
-      
+
       // iOS: Must resume AudioContext after user gesture
       if (audioContext.state === "suspended") {
         await audioContext.resume();
       }
+
+      // Auto-resume if iOS suspends the context when Spotify starts playing
+      audioContext.addEventListener("statechange", () => {
+        if (audioContext.state === "suspended") {
+          audioContext.resume().catch(() => {});
+        }
+      });
       
       const analyser = audioContext.createAnalyser();
       // Larger FFT for better buffering and less CPU
@@ -154,9 +161,16 @@ const source = audioContext.createMediaStreamSource(analysisStream);
       source.connect(analyser);
       // Don't connect to destination - we only analyze, prevents iOS audio session conflicts
 
-      audioContextRef.current = audioContext;
+     audioContextRef.current = audioContext;
       analyserRef.current = analyser;
       streamRef.current = stream;
+
+      // Re-enable mic track if iOS mutes it during audio session reconfiguration
+      stream.getAudioTracks().forEach((track) => {
+        track.onmute = () => {
+          track.enabled = true;
+        };
+      });
 
       setIsMicEnabled(true);
 
