@@ -60,12 +60,28 @@ export async function pausePlayback(accessToken: string): Promise<void> {
 
 // Remote control: Resume playback on the user's active device
 // This does NOT specify a device_id, so it won't transfer playback
+export async function getAvailableDevices(accessToken: string): Promise<{ id: string; name: string; is_active: boolean }[]> {
+  const response = await fetch(`${SPOTIFY_API_BASE}/me/player/devices`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) return [];
+  const data = await response.json();
+  return data.devices ?? [];
+}
+
 export async function resumePlayback(accessToken: string): Promise<void> {
-  await fetch(`${SPOTIFY_API_BASE}/me/player/play`, {
+  // Fetch available devices and target the first one explicitly
+  // Needed for iOS where Spotify loses "active" status when backgrounded
+  const devices = await getAvailableDevices(accessToken);
+  const targetDevice = devices.find((d) => d.is_active) ?? devices[0];
+
+  await fetch(`${SPOTIFY_API_BASE}/me/player/play${targetDevice ? `?device_id=${targetDevice.id}` : ""}`, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
     },
+    body: JSON.stringify({}),
   });
 }
 
