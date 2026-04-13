@@ -105,13 +105,9 @@ const [isConnected, setIsConnected] = useState(false);
     const pc = new RTCPeerConnection(iceConfigRef.current);
 
     // Add local audio tracks
-    if (localStreamRef.current) {
+ if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
         pc.addTrack(track, localStreamRef.current!);
-        // Re-enable if iOS mutes the track when Spotify starts playing
-        track.onmute = () => {
-          track.enabled = true;
-        };
       });
     }
 
