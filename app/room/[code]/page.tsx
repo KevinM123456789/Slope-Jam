@@ -250,7 +250,8 @@ const initMic = useCallback(async () => {
         micStreamRef.current.getTracks().forEach(track => track.stop());
       }
     };
-  }, [localUser, initMic]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Sync mute state with actual audio track and broadcast to peers
   useEffect(() => {
