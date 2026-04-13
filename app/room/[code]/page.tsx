@@ -121,6 +121,7 @@ export default function RoomPage({ params }: RoomPageProps) {
     sendPingTo,
     participantCount,
     replaceLocalTrack,
+    isHardwareMicMuted,
     error: peerError,
   } = usePeerVoice({
     roomCode: code,
@@ -578,7 +579,7 @@ const isRemoteSpeaking = participants.some(
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col px-4 py-6 gap-6 overflow-y-auto">
-        {isAudioInterrupted && (
+       {(isAudioInterrupted || isHardwareMicMuted) && (
           <button
             onClick={handleRestoreAudio}
             className="w-full py-3 rounded-xl bg-orange text-white font-semibold text-sm flex items-center justify-center gap-2 animate-pulse"
