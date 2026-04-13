@@ -20,9 +20,6 @@ import Image from "next/image";
 interface NowPlayingCardProps {
   volume: number;
   isDucking: boolean;
-  isHost?: boolean; // Only host fetches Spotify data to reduce traffic
-  guestTrack?: SpotifyTrack | null; // Track info received from host (for guests)
-  onTrackChange?: (track: SpotifyTrack) => void; // Callback when host's track changes
 }
 
 // Remote control API - sends commands to user's Spotify app (no playback transfer)
@@ -101,25 +98,9 @@ const TrackDisplay = memo(function TrackDisplay({
 function NowPlayingCardInner({
   volume,
   isDucking,
-  isHost = true, // Default to host behavior for backwards compatibility
-  guestTrack,
-  onTrackChange,
 }: NowPlayingCardProps) {
   const { status } = useSession();
-  // Only fetch Spotify data if user is host - guests receive via socket
-  const { track: hostTrack, isLoading, mutate } = useSpotify({ enabled: isHost });
-  
-  // Use guest track if available (for non-hosts), otherwise use host track
-  const track = (!isHost && guestTrack) ? guestTrack : hostTrack;
-  
-  // Host broadcasts track changes to guests
-  const prevTrackRef = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    if (isHost && onTrackChange && hostTrack.title && hostTrack.title !== prevTrackRef.current) {
-      prevTrackRef.current = hostTrack.title;
-      onTrackChange(hostTrack);
-    }
-  }, [isHost, hostTrack, onTrackChange]);
+  const { track, isLoading, mutate } = useSpotify({ enabled: true });
   const [isControlling, setIsControlling] = useState(false);
   const [activeButton, setActiveButton] = useState<string | null>(null);
 
