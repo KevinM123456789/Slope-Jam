@@ -43,13 +43,6 @@ export default function RoomPage({ params }: RoomPageProps) {
   const [micInitialized, setMicInitialized] = useState(false);
   const [showMicRetry, setShowMicRetry] = useState(false);
   // Track info received from host (for guests)
-  const [guestTrack, setGuestTrack] = useState<{
-    isPlaying: boolean;
-    title?: string;
-    artist?: string;
-    album?: string;
-    albumArt?: string;
-  } | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
   const hasShownConnectedToast = useRef(false);
   const hasUserGesture = useRef(false);
@@ -117,7 +110,6 @@ export default function RoomPage({ params }: RoomPageProps) {
     broadcastSpeakingState,
     broadcastFlowMode,
     broadcastMuteState,
-    broadcastTrackInfo,
     sendPingTo,
     participantCount,
     replaceLocalTrack,
@@ -140,12 +132,6 @@ export default function RoomPage({ params }: RoomPageProps) {
       });
       if (navigator.vibrate) {
         navigator.vibrate([200, 100, 200, 100, 200]);
-      }
-    },
-    // Guests receive track info from host
-    onTrackInfo: (track) => {
-      if (!isHostLocked) {
-        setGuestTrack(track);
       }
     },
   });
@@ -591,14 +577,7 @@ const isRemoteSpeaking = participants.some(
         {localUser.hasSpotify && (
           <NowPlayingCard
             volume={musicVolume}
-            isDucking={isSomeoneSpeaking || isRemoteSpeaking}
-            isHost={isHostLocked}
-            guestTrack={guestTrack}
-            onTrackChange={(track) => {
-              if (isHostLocked && isPeerConnected) {
-                broadcastTrackInfo(track);
-              }
-            }}
+            isDucking={isUserSpeaking || isRemoteSpeaking}
           />
         )}
 
