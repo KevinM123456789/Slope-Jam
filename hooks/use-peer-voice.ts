@@ -3,14 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { RoomParticipant } from "@/contexts/room-context";
 
-interface TrackInfoPayload {
-  isPlaying: boolean;
-  title?: string;
-  artist?: string;
-  album?: string;
-  albumArt?: string;
-}
-
 interface UsePeerVoiceOptions {
   roomCode: string;
   localUser: { id: string; displayName: string; hasSpotify: boolean };
@@ -20,7 +12,6 @@ interface UsePeerVoiceOptions {
   onParticipantUpdate?: (peerId: string, updates: Partial<RoomParticipant>) => void;
   onRemoteSpeaking?: (peerId: string, isSpeaking: boolean) => void;
   onPingReceived?: (fromName: string) => void;
-  onTrackInfo?: (track: TrackInfoPayload) => void;
 }
 
 interface PeerConn {
@@ -349,8 +340,8 @@ if (isHostRef.current) {
       setError(err instanceof Error ? err.message : "Failed to connect");
       setIsConnecting(false);
     }
-  }, [roomCode, isHost, onParticipantJoin, onParticipantLeave, onParticipantUpdate,
-      onRemoteSpeaking, onPingReceived, onTrackInfo, publish, createPC, initiateCall]);
+}, [roomCode, isHost, onParticipantJoin, onParticipantLeave, onParticipantUpdate,
+      onRemoteSpeaking, onPingReceived, publish, createPC, initiateCall]);
 
   const toggleMute = useCallback(() => {
     if (localStreamRef.current) {
