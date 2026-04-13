@@ -37,14 +37,13 @@ export function useSpotify(options: UseSpotifyOptions = {}) {
       revalidateOnFocus: false, // Don't auto-refetch on focus (we handle manually)
       revalidateOnReconnect: false, // Don't auto-refetch on reconnect
       dedupingInterval: 5000, // Prevent duplicate requests within 5s
-      compare: (a, b) => {
-        // Custom compare to prevent re-renders when only isPlaying changes
-        // Only re-render when the actual track changes (different song)
+     compare: (a, b) => {
         if (!a && !b) return true;
         if (!a || !b) return false;
-        return a.title === b.title && 
-               a.artist === b.artist && 
-               a.albumArt === b.albumArt;
+        return a.title === b.title &&
+               a.artist === b.artist &&
+               a.albumArt === b.albumArt &&
+               a.isPlaying === b.isPlaying;
       },
     }
   );
