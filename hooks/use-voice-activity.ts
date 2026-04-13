@@ -32,6 +32,7 @@ export function useVoiceActivity(
   const [isMicEnabled, setIsMicEnabled] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentRMS, setCurrentRMS] = useState(0);
+  const [isAudioInterrupted, setIsAudioInterrupted] = useState(false);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -144,7 +145,12 @@ export function useVoiceActivity(
       // Auto-resume if iOS suspends the context when Spotify starts playing
       audioContext.addEventListener("statechange", () => {
         if (audioContext.state === "suspended") {
-          audioContext.resume().catch(() => {});
+          audioContext.resume().catch(() => {
+            // iOS blocked resume without user gesture — set interrupted flag
+            setIsAudioInterrupted(true);
+          });
+        } else if (audioContext.state === "running") {
+          setIsAudioInterrupted(false);
         }
       });
       
@@ -237,10 +243,11 @@ const source = audioContext.createMediaStreamSource(analysisStream);
     };
   }, []);
 
-  return {
+ return {
     isMicEnabled,
     isSpeaking,
     currentRMS,
+    isAudioInterrupted,
     enableMic,
     disableMic,
     toggleMic,
