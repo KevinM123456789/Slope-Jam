@@ -41,10 +41,11 @@ export async function PUT(request: Request) {
       default:
         return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
-  } catch (error) {
-    console.error("Error controlling playback:", error);
+ } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Error controlling playback:", message);
     return NextResponse.json(
-      { error: "Failed to control playback" },
+      { error: "Failed to control playback", detail: message },
       { status: 500 }
     );
   }
