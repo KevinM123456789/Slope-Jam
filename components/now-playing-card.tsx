@@ -28,10 +28,10 @@ interface NowPlayingCardProps {
 // Remote control API - sends commands to user's Spotify app (no playback transfer)
 async function controlPlayback(action: "play" | "pause" | "next" | "previous"): Promise<boolean> {
   try {
-    const response = await fetch("/api/spotify/playback", {
+    const response = await fetch("/api/spotify/control", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
+body: JSON.stringify({ action }),
     });
     return response.ok;
   } catch (error) {
