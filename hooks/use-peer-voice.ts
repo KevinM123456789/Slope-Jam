@@ -180,9 +180,7 @@ publish("offer", {
       const tokenRes = await fetch("/api/ably-token");
       const tokenRequest = await tokenRes.json();
       const { Realtime } = await import("ably");
-      const ably = new Realtime({
-        authCallback: (_data, callback) => callback(null, tokenRequest),
-      });
+      const ably = new Realtime({ authUrl: "/api/ably-token" });
       ablyRef.current = ably;
 
       const myPeerId = crypto.randomUUID();
@@ -229,22 +227,16 @@ if (isHostRef.current) {
           }
 
           case "offer": {
-  console.log("OFFER RECEIVED, target:", data.targetPeerId, "myId:", myPeerId, "match:", data.targetPeerId === myPeerId);
-  if (data.targetPeerId !== myPeerId) break;
-  (async () => {
-    console.log("PROCESSING OFFER from:", fromPeerId);
+            console.log("OFFER RECEIVED, target:", data.targetPeerId, "myId:", myPeerId, "match:", data.targetPeerId === myPeerId);
+            if (data.targetPeerId !== myPeerId) break;
+            (async () => {
+              console.log("PROCESSING OFFER from:", fromPeerId);
               let conn = peersRef.current.get(fromPeerId);
-if (!conn) {
-  const pc = createPC(fromPeerId);
-  // Add local tracks so the other side can hear us
-  if (localStreamRef.current) {
-    localStreamRef.current.getTracks().forEach(track => {
-      pc.addTrack(track, localStreamRef.current!);
-    });
-  }
-  conn = { peerId: fromPeerId, pc, audioEl: null };
-  peersRef.current.set(fromPeerId, conn);
-}
+              if (!conn) {
+                const pc = createPC(fromPeerId);
+                conn = { peerId: fromPeerId, pc, audioEl: null };
+                peersRef.current.set(fromPeerId, conn);
+              }
               try {
                 await conn.pc.setRemoteDescription(
                   new RTCSessionDescription(data.offer as RTCSessionDescriptionInit)
@@ -318,15 +310,22 @@ if (!conn) {
         }
       });
 
-      // Announce presence after subscribing
-      setTimeout(() => {
-        publish("join", {
-          peerId: myPeerId,
-          displayName: localUserRef.current.displayName,
-          hasSpotify: localUserRef.current.hasSpotify,
-          isHost,
-        });
-      }, 300);
+     await new Promise<void>((resolve) => {
+        if (ably.connection.state === "connected") return resolve();
+        ably.connection.once("connected", () => resolve());
+      });
+
+      await new Promise<void>((resolve) => {
+        if ((channel as any).state === "attached") return resolve();
+        channel.once("attached", () => resolve());
+      });
+
+      publish("join", {
+        peerId: myPeerId,
+        displayName: localUserRef.current.displayName,
+        hasSpotify: localUserRef.current.hasSpotify,
+        isHost: isHostRef.current,
+      });
 
       setLocalPeerId(myPeerId);
       setIsConnected(true);
@@ -346,15 +345,19 @@ if (!conn) {
     }
   }, []);
 
-  useEffect(() => {
-    return () => {
-      publish("leave", { peerId: myPeerIdRef.current });
-      channelRef.current?.unsubscribe();
-      ablyRef.current?.close();
-      localStreamRef.current?.getTracks().forEach(t => t.stop());
-      peersRef.current.forEach(conn => { conn.pc.close(); conn.audioEl?.pause(); });
-    };
-  }, [publish]);
+useEffect(() => {
+  return () => {
+    publish("leave", { peerId: myPeerIdRef.current });
+    channelRef.current?.unsubscribe();
+    ablyRef.current?.close();
+    ablyRef.current = null;
+    myPeerIdRef.current = null;
+    peersRef.current.clear();
+    joinedPeerIdsRef.current.clear();
+    localStreamRef.current?.getTracks().forEach(t => t.stop());
+    localStreamRef.current = null;
+  };
+}, [publish]);
 
   return {
     isConnected, isConnecting, localPeerId, error, participantCount,
