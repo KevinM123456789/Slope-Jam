@@ -83,12 +83,11 @@ export default function RoomPage({ params }: RoomPageProps) {
 
   const {
     duckingLevel,
-    isSomeoneSpeaking,
-    isPlaying,
-    musicVolume,
-    togglePlayPause,
     setDuckingLevel,
   } = useAudioDucking();
+
+  const isAnySpeaking = isUserSpeaking || isRemoteSpeaking;
+  const musicVolume = isAnySpeaking ? duckingLevel : 100;
 
   // Note: Spotify state is fully isolated in NowPlayingCard component
   // It uses its own useSpotify hook to prevent voice/mic components from re-rendering
@@ -442,17 +441,21 @@ const isRemoteSpeaking = participants.some(
     (p) => p.peerId !== localUser.id && p.isSpeaking && !p.isInFlowMode
   );
 
-  // Apply Spotify volume ducking when speaking state changes
+ // Apply Spotify volume ducking when speaking state changes
+  const duckingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   useEffect(() => {
-    if (!isHostLocked || !localUser?.hasSpotify) return;
+    if (!localUser?.hasSpotify) return;
     const shouldDuck = isUserSpeaking || isRemoteSpeaking;
     const targetVolume = shouldDuck ? duckingLevel : 100;
-    fetch("/api/spotify/volume", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ volumePercent: targetVolume }),
-    }).catch(() => {});
-  }, [isUserSpeaking, isRemoteSpeaking, duckingLevel, isHostLocked, localUser?.hasSpotify]);
+    if (duckingTimeoutRef.current) clearTimeout(duckingTimeoutRef.current);
+    duckingTimeoutRef.current = setTimeout(() => {
+      fetch("/api/spotify/volume", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ volumePercent: targetVolume }),
+      }).catch(() => {});
+    }, 150);
+  }, [isUserSpeaking, isRemoteSpeaking, duckingLevel, localUser?.hasSpotify]);
 
   // Voice activity is only shown when unmuted
   const showVoiceActivity = !isMuted && isUserSpeaking;
