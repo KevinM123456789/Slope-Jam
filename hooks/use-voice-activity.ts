@@ -133,7 +133,7 @@ export function useVoiceActivity(
       // Using standard sample rate for better iOS compatibility
       const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const audioContext = new AudioContextClass({
-        latencyHint: "playback", // Tells iOS we're not a real-time audio app
+        latencyHint: "interactive",
       });
       
       // iOS: Must resume AudioContext after user gesture
