@@ -36,11 +36,12 @@ export function usePeerVoice(options: UsePeerVoiceOptions) {
     onRemoteSpeaking, onPingReceived, onTrackInfo,
   } = options;
 
-  const [isConnected, setIsConnected] = useState(false);
+const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [localPeerId, setLocalPeerId] = useState<string | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [isMicMuted, setIsMicMuted] = useState(false);
+  const [isHardwareMicMuted, setIsHardwareMicMuted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [participantCount, setParticipantCount] = useState(1);
 
@@ -176,6 +177,15 @@ publish("offer", {
       });
       localStreamRef.current = stream;
       setLocalStream(stream);
+
+      // Detect when iOS hardware-mutes the mic track (happens when Spotify starts playing)
+      stream.getAudioTracks().forEach((track) => {
+        track.onmute = () => setIsHardwareMicMuted(true);
+        track.onunmute = () => {
+          track.enabled = true;
+          setIsHardwareMicMuted(false);
+        };
+      });
 
       // Load TURN credentials
       const turnRes = await fetch("/api/turn-credentials");
@@ -378,7 +388,7 @@ useEffect(() => {
 return {
     isConnected, isConnecting, localPeerId, error, participantCount,
     localStream, initializePeer, connectToPeer, toggleMute, isMicMuted,
-    broadcastSpeakingState, broadcastFlowMode, broadcastMuteState,
+    isHardwareMicMuted, broadcastSpeakingState, broadcastFlowMode, broadcastMuteState,
     broadcastTrackInfo, sendPingTo, replaceLocalTrack,
   };
 }
