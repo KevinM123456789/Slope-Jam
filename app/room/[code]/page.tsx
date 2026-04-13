@@ -120,6 +120,7 @@ export default function RoomPage({ params }: RoomPageProps) {
     broadcastTrackInfo,
     sendPingTo,
     participantCount,
+    replaceLocalTrack,
     error: peerError,
   } = usePeerVoice({
     roomCode: code,
@@ -153,6 +154,7 @@ export default function RoomPage({ params }: RoomPageProps) {
     isMicEnabled,
     isSpeaking: isUserSpeaking,
     currentRMS,
+    isAudioInterrupted,
     enableMic,
     disableMic,
     resumeAudioContext,
@@ -322,6 +324,19 @@ const initMic = useCallback(async () => {
   }, [resumeAudioContext]);
 
   // Handle mute toggle - also broadcast to peers for iOS sync
+  const handleRestoreAudio = useCallback(async () => {
+    try {
+      await resumeAudioContext();
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      micStreamRef.current = newStream;
+      await enableMic(newStream);
+      await replaceLocalTrack(newStream);
+    } catch {
+      toast.error("Failed to restore audio. Try rejoining.", { id: "audio-restore" });
+    }
+  }, [resumeAudioContext, enableMic, replaceLocalTrack]);
   const handleMuteToggle = useCallback(() => {
     const newMuteState = !isMuted;
     setIsMuted(newMuteState);
@@ -563,6 +578,15 @@ const isRemoteSpeaking = participants.some(
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col px-4 py-6 gap-6 overflow-y-auto">
+        {isAudioInterrupted && (
+          <button
+            onClick={handleRestoreAudio}
+            className="w-full py-3 rounded-xl bg-orange text-white font-semibold text-sm flex items-center justify-center gap-2 animate-pulse"
+          >
+            🎙️ Tap to restore voice audio
+          </button>
+        )}
+
         {localUser.hasSpotify && (
           <NowPlayingCard
             volume={musicVolume}
