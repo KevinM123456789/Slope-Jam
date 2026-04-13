@@ -74,11 +74,6 @@ const [isConnected, setIsConnected] = useState(false);
     publish("mute-state", { isMuted, peerId: myPeerIdRef.current });
   }, [publish]);
 
-  const broadcastTrackInfo = useCallback((track: TrackInfoPayload) => {
-    if (!isHostRef.current) return;
-    publish("track-info", { ...track, peerId: myPeerIdRef.current });
-  }, [publish]);
-
   const sendPingTo = useCallback((targetPeerId: string) => {
     publish("ping", {
       targetPeerId,
@@ -326,9 +321,6 @@ if (isHostRef.current) {
             if (data.targetPeerId === myPeerId) onPingReceived?.(data.fromName as string);
             break;
 
-          case "track-info":
-            if (!isHostRef.current) onTrackInfo?.(data as unknown as TrackInfoPayload);
-            break;
         }
       });
 
@@ -385,6 +377,6 @@ return {
     isConnected, isConnecting, localPeerId, error, participantCount,
     localStream, initializePeer, connectToPeer, toggleMute, isMicMuted,
     isHardwareMicMuted, broadcastSpeakingState, broadcastFlowMode, broadcastMuteState,
-    broadcastTrackInfo, sendPingTo, replaceLocalTrack,
+    sendPingTo, replaceLocalTrack,
   };
 }
