@@ -86,8 +86,6 @@ export default function RoomPage({ params }: RoomPageProps) {
     setDuckingLevel,
   } = useAudioDucking();
 
-  const isAnySpeaking = isUserSpeaking || isRemoteSpeaking;
-  const musicVolume = isAnySpeaking ? duckingLevel : 100;
 
   // Note: Spotify state is fully isolated in NowPlayingCard component
   // It uses its own useSpotify hook to prevent voice/mic components from re-rendering
