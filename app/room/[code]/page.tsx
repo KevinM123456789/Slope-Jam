@@ -439,6 +439,9 @@ const isRemoteSpeaking = participants.some(
     (p) => p.peerId !== localUser.id && p.isSpeaking && !p.isInFlowMode
   );
 
+  const isAnySpeaking = isUserSpeaking || isRemoteSpeaking;
+  const musicVolume = isAnySpeaking ? duckingLevel : 100;
+
  // Apply Spotify volume ducking when speaking state changes
   const duckingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   useEffect(() => {
